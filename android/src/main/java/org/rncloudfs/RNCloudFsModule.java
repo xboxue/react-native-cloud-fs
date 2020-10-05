@@ -28,6 +28,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
+import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
@@ -49,6 +50,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
     public static final String TAG = "RNCloudFs";
     private static final int REQUEST_CODE_SIGN_IN = 1;
     private static final int REQUEST_CODE_OPEN_DOCUMENT = 2;
+    private static final int REQUEST_AUTHORIZATION = 11;
     private DriveServiceHelper mDriveServiceHelper;
 
     private Promise signInPromise;
@@ -58,7 +60,6 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
     public RNCloudFsModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.reactContext = reactContext;
-
 
         reactContext.addLifecycleEventListener(this);
         reactContext.addActivityEventListener(this);
@@ -117,7 +118,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
     public void loginIfNeeded(final Promise promise){
         if (mDriveServiceHelper == null) {
             this.signInPromise = promise;
-            requestSignIn();
+            requestAuth(REQUEST_CODE_SIGN_IN);
         }  else {
             promise.resolve(true);
         }
@@ -144,7 +145,15 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
                         result.putArray("files", files);
                         promise.resolve(result);
                     })
-                    .addOnFailureListener(exception -> Log.e(TAG, "Unable to query files.", exception));
+                    .addOnFailureListener(exception -> {
+                        Log.e(TAG, "Unable to query files: " + exception.getCause().getMessage());
+                        try{
+                            UserRecoverableAuthIOException e = (UserRecoverableAuthIOException)exception;
+                            this.reactContext.startActivityForResult(e.getIntent(), REQUEST_AUTHORIZATION, null);
+                        } catch(Exception e){
+                            throw e;
+                        }
+                    });
         }
     }
 
@@ -255,7 +264,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
      * Starts a sign-in activity using {@link #REQUEST_CODE_SIGN_IN}.
      */
     @ReactMethod
-    public void requestSignIn() {
+    public void requestAuth(int code) {
         Log.d(TAG, "Requesting sign-in");
 
         GoogleSignInOptions signInOptions =
@@ -266,7 +275,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
         GoogleSignInClient client = GoogleSignIn.getClient(this.reactContext, signInOptions);
 
         // The result of the sign-in Intent is handled in onActivityResult.
-        this.reactContext.startActivityForResult(client.getSignInIntent(), REQUEST_CODE_SIGN_IN, null);
+        this.reactContext.startActivityForResult(client.getSignInIntent(), code, null);
     }
 
     @ReactMethod
@@ -292,7 +301,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
 
     /**
      * Handles the {@code result} of a completed sign-in activity initiated from {@link
-     * #requestSignIn()}.
+     * #requestAuth(int)} ()}.
      */
     private void handleSignInResult(Intent result) {
         GoogleSignIn.getSignedInAccountFromIntent(result)
