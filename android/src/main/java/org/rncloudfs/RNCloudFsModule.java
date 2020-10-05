@@ -118,7 +118,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
     public void loginIfNeeded(final Promise promise){
         if (mDriveServiceHelper == null) {
             this.signInPromise = promise;
-            requestAuth(REQUEST_CODE_SIGN_IN);
+            requestSignIn();
         }  else {
             promise.resolve(true);
         }
@@ -264,7 +264,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
      * Starts a sign-in activity using {@link #REQUEST_CODE_SIGN_IN}.
      */
     @ReactMethod
-    public void requestAuth(int code) {
+    public void requestSignIn() {
         Log.d(TAG, "Requesting sign-in");
 
         GoogleSignInOptions signInOptions =
@@ -275,7 +275,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
         GoogleSignInClient client = GoogleSignIn.getClient(this.reactContext, signInOptions);
 
         // The result of the sign-in Intent is handled in onActivityResult.
-        this.reactContext.startActivityForResult(client.getSignInIntent(), code, null);
+        this.reactContext.startActivityForResult(client.getSignInIntent(), REQUEST_CODE_SIGN_IN, null);
     }
 
     @ReactMethod
@@ -301,7 +301,7 @@ public class RNCloudFsModule extends ReactContextBaseJavaModule implements Googl
 
     /**
      * Handles the {@code result} of a completed sign-in activity initiated from {@link
-     * #requestAuth(int)} ()}.
+     * #requestSignIn()} ()}.
      */
     private void handleSignInResult(Intent result) {
         GoogleSignIn.getSignedInAccountFromIntent(result)
